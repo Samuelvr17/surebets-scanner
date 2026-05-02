@@ -38,6 +38,7 @@ class CollectorResult:
     finished_at_utc: datetime
     captures: list[CaptureRecord] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
+    duplicates_discarded: int = 0
 
 
 class OddsCollector(Protocol):
@@ -65,8 +66,19 @@ class BaseBookmakerCollector:
         )
         try:
             payloads = self.fetch_raw_payloads()
+            seen_hashes: set[str] = set()
             for payload in payloads:
-                result.captures.append(self._build_capture(payload=payload))
+                capture = self._build_capture(payload=payload)
+                if capture.payload_hash in seen_hashes:
+                    result.duplicates_discarded += 1
+                    logger.warning(
+                        "[%s] Payload duplicado descartado. hash=%s",
+                        self.config.bookmaker,
+                        capture.payload_hash[:12],
+                    )
+                    continue
+                seen_hashes.add(capture.payload_hash)
+                result.captures.append(capture)
         except Exception as exc:  # nosec B110
             message = f"{self.config.bookmaker} collector failed safely: {exc}"
             logger.exception(message)

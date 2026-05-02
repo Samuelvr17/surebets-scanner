@@ -40,6 +40,7 @@ def main() -> None:
         {
             "bookmaker": r.bookmaker,
             "captures": len(r.captures),
+            "duplicates_discarded": r.duplicates_discarded,
             "errors": r.errors,
             "started_at_utc": r.started_at_utc.isoformat(),
             "finished_at_utc": r.finished_at_utc.isoformat(),
