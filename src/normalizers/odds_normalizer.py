@@ -1,1 +1,214 @@
-# Normaliza nombres de equipos, ligas, mercados y formato de cuotas.
+"""Normalización estricta de payloads crudos a formato canónico.
+
+Diseño robusto para scraping amplio:
+- Usa aliases explícitos si existen.
+- Si no existen, aplica normalización heurística para no depender de listas completas.
+- Emite claves canónicas (`*_key`) estables para matching cross-book.
+- Mantiene descarte estricto solo para campos realmente inválidos o mercados ambiguos.
+"""
+
+from __future__ import annotations
+
+import json
+import re
+import unicodedata
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from decimal import Decimal, InvalidOperation
+from pathlib import Path
+from typing import Any
+
+TEAM_TOKEN_EXPANSIONS = {
+    "atl": "atletico",
+    "ath": "athletic",
+    "dep": "deportivo",
+    "ud": "united",
+    "utd": "united",
+    "int": "internazionale",
+    "inter": "internazionale",
+    "st": "saint",
+    "ste": "sainte",
+    "med": "medellin",
+}
+
+STOPWORDS = {"fc", "cf", "sc", "club", "de", "ac", "cd", "ud"}
+
+
+@dataclass(slots=True)
+class DiscardedOdd:
+    bookmaker: str
+    source_event_id: str
+    reason: str
+    raw_odd: dict[str, Any]
+
+
+@dataclass(slots=True)
+class NormalizedOddRecord:
+    bookmaker: str
+    source_event_id: str
+    league: str
+    league_key: str
+    home_team: str
+    home_team_key: str
+    away_team: str
+    away_team_key: str
+    event_start_utc: datetime
+    market_type: str
+    selection: str
+    line_value: str | None
+    odds_decimal: Decimal
+
+
+@dataclass(slots=True)
+class NormalizationResult:
+    normalized: list[NormalizedOddRecord]
+    discarded: list[DiscardedOdd]
+
+
+class OddsNormalizer:
+    def __init__(self, aliases_file: Path | None = None) -> None:
+        default_file = Path(__file__).with_name("aliases.json")
+        self.aliases_file = aliases_file or default_file
+        aliases = json.loads(self.aliases_file.read_text(encoding="utf-8"))
+        self.team_aliases = {self._key(k): v for k, v in aliases.get("teams", {}).items()}
+        self.league_aliases = {self._key(k): v for k, v in aliases.get("leagues", {}).items()}
+
+    @staticmethod
+    def _key(value: str) -> str:
+        normalized = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode("ascii")
+        normalized = normalized.lower().strip()
+        normalized = re.sub(r"[^a-z0-9\s]", " ", normalized)
+        return re.sub(r"\s+", " ", normalized)
+
+    def normalize_payload(self, bookmaker: str, source_event_id: str, payload: dict[str, Any]) -> NormalizationResult:
+        discarded: list[DiscardedOdd] = []
+        normalized: list[NormalizedOddRecord] = []
+
+        home_name, home_key = self._normalize_entity(payload.get("home_team"), self.team_aliases, is_team=True)
+        away_name, away_key = self._normalize_entity(payload.get("away_team"), self.team_aliases, is_team=True)
+        league_name, league_key = self._normalize_entity(payload.get("league"), self.league_aliases, is_team=False)
+
+        if not home_name or not away_name:
+            return NormalizationResult([], [DiscardedOdd(bookmaker, source_event_id, "invalid_team_name", payload)])
+        if not league_name:
+            return NormalizationResult([], [DiscardedOdd(bookmaker, source_event_id, "invalid_league_name", payload)])
+
+        event_start_utc = self._parse_utc(payload.get("event_start"))
+        if not event_start_utc:
+            return NormalizationResult([], [DiscardedOdd(bookmaker, source_event_id, "invalid_event_start", payload)])
+
+        for odd in payload.get("odds", []):
+            market_type = self._classify_market(odd)
+            if not market_type:
+                discarded.append(DiscardedOdd(bookmaker, source_event_id, "unknown_or_ambiguous_market", odd))
+                continue
+
+            decimal_odd = self._to_decimal_odd(odd.get("odds"))
+            if decimal_odd is None:
+                discarded.append(DiscardedOdd(bookmaker, source_event_id, "invalid_odds_format", odd))
+                continue
+
+            selection = str(odd.get("selection", "")).strip()
+            if not selection:
+                discarded.append(DiscardedOdd(bookmaker, source_event_id, "missing_selection", odd))
+                continue
+
+            normalized.append(
+                NormalizedOddRecord(
+                    bookmaker=bookmaker,
+                    source_event_id=source_event_id,
+                    league=league_name,
+                    league_key=league_key,
+                    home_team=home_name,
+                    home_team_key=home_key,
+                    away_team=away_name,
+                    away_team_key=away_key,
+                    event_start_utc=event_start_utc,
+                    market_type=market_type,
+                    selection=selection,
+                    line_value=str(odd.get("line")) if odd.get("line") is not None else None,
+                    odds_decimal=decimal_odd,
+                )
+            )
+
+        return NormalizationResult(normalized=normalized, discarded=discarded)
+
+    def _normalize_entity(self, value: Any, alias_map: dict[str, str], *, is_team: bool) -> tuple[str | None, str | None]:
+        if not value:
+            return None, None
+        raw = str(value)
+        raw_key = self._key(raw)
+        if raw_key in alias_map:
+            name = alias_map[raw_key]
+            return name, self._entity_key(name, is_team=is_team)
+
+        # fallback robusto: no descartar por falta de alias
+        if not raw_key:
+            return None, None
+        display = " ".join(token.capitalize() for token in raw_key.split())
+        return display, self._entity_key(raw_key, is_team=is_team)
+
+    def _entity_key(self, value: str, *, is_team: bool) -> str:
+        tokens = self._key(value).split()
+        if is_team:
+            tokens = [TEAM_TOKEN_EXPANSIONS.get(t, t) for t in tokens if t not in STOPWORDS]
+        else:
+            tokens = [t for t in tokens if t not in {"league", "liga", "division"}]
+        # orden estable para comparación cross-book aunque cambie el orden textual
+        return " ".join(sorted(set(tokens)))
+
+    def _parse_utc(self, value: Any) -> datetime | None:
+        if not isinstance(value, str) or not value.strip():
+            return None
+        try:
+            dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+        if dt.tzinfo is None:
+            return None
+        return dt.astimezone(UTC)
+
+    def _classify_market(self, odd: dict[str, Any]) -> str | None:
+        text = self._key(f"{odd.get('market', '')} {odd.get('selection', '')}")
+        if any(k in text for k in ["1x2", "full time result", "match winner"]) and "handicap" not in text:
+            return "MATCH_RESULT_1X2"
+        if "asian handicap" in text:
+            return "ASIAN_HANDICAP"
+        if "over under" in text or "totals" in text:
+            return "TOTALS"
+        if "both teams to score" in text or "btts" in text:
+            return "BTTS"
+        return None
+
+    def _to_decimal_odd(self, value: Any) -> Decimal | None:
+        if value is None:
+            return None
+        if isinstance(value, (int, float, Decimal, str)):
+            s = str(value).strip()
+            if not s:
+                return None
+            if "/" in s:
+                parts = s.split("/")
+                if len(parts) == 2:
+                    try:
+                        num = Decimal(parts[0])
+                        den = Decimal(parts[1])
+                        if den == 0:
+                            return None
+                        return (num / den) + Decimal("1")
+                    except InvalidOperation:
+                        return None
+            if s.startswith(("+", "-")):
+                try:
+                    american = Decimal(s)
+                    if american > 0:
+                        return (american / Decimal("100")) + Decimal("1")
+                    return (Decimal("100") / abs(american)) + Decimal("1")
+                except InvalidOperation:
+                    return None
+            try:
+                dec = Decimal(s)
+                return dec if dec > 1 else None
+            except InvalidOperation:
+                return None
+        return None
