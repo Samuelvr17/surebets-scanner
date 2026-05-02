@@ -41,3 +41,31 @@ python -m src.main
 ```
 
 Devuelve resumen JSON por casa con capturas y errores.
+
+## Depurar un colector individual (tiempo real)
+
+```bash
+python -m src.collectors.debug_tools betplay --show-files
+```
+
+Opciones útiles:
+- `--show-files`: muestra tamaño/ubicación exacta de cada dump crudo guardado.
+- `--show-payload`: imprime el payload completo capturado.
+
+El resumen final incluye:
+- duración real,
+- número de capturas,
+- duplicados descartados,
+- lista exacta de errores.
+
+## Pruebas de contrato de colectores
+
+```bash
+pytest -q tests/test_collector_contract.py
+```
+
+Valida que:
+- se guarden raw payloads en disco,
+- los errores no se oculten,
+- se deduplique payload repetido,
+- la validación de archivo de sesión falle explícitamente cuando la casa no existe.
