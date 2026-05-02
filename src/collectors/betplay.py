@@ -1,1 +1,7 @@
-# Collector específico para capturar datos crudos desde BetPlay.
+"""Collector específico para betplay."""
+
+from src.collectors.browser_collectors import PlaceholderXHRCollector
+
+
+class Collector(PlaceholderXHRCollector):
+    pass
