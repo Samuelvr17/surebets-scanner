@@ -1,7 +1,7 @@
 """Normalización estricta de payloads crudos a formato canónico.
 
 Reglas clave:
-- Nombres (equipos/ligas) vía tabla de aliases externa editable en JSON.
+- Nombres (equipos/ligas) por canonización robusta basada en texto (sin aliases estáticos).
 - Hora del evento siempre convertida a UTC.
 - Mercado clasificado de forma estricta; si hay ambigüedad se descarta.
 - Cuotas convertidas a decimal.
@@ -10,13 +10,11 @@ Reglas clave:
 
 from __future__ import annotations
 
-import json
 import re
 import unicodedata
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
-from pathlib import Path
 from typing import Any
 
 
@@ -49,12 +47,15 @@ class NormalizationResult:
 
 
 class OddsNormalizer:
-    def __init__(self, aliases_file: Path | None = None) -> None:
-        default_file = Path(__file__).with_name("aliases.json")
-        self.aliases_file = aliases_file or default_file
-        aliases = json.loads(self.aliases_file.read_text(encoding="utf-8"))
-        self.team_aliases = {self._key(k): v for k, v in aliases.get("teams", {}).items()}
-        self.league_aliases = {self._key(k): v for k, v in aliases.get("leagues", {}).items()}
+    TEAM_NOISE_TOKENS = {
+        "fc", "cf", "sc", "ac", "cd", "ca", "deportivo", "club", "atletico", "athletic"
+    }
+    LEAGUE_NOISE_TOKENS = {
+        "liga", "league", "division", "premier", "primera", "serie", "cup", "copa", "torneo"
+    }
+
+    def __init__(self) -> None:
+        pass
 
     @staticmethod
     def _key(value: str) -> str:
@@ -67,19 +68,19 @@ class OddsNormalizer:
         discarded: list[DiscardedOdd] = []
         normalized: list[NormalizedOddRecord] = []
 
-        home = self._normalize_alias(payload.get("home_team"), self.team_aliases)
-        away = self._normalize_alias(payload.get("away_team"), self.team_aliases)
-        league = self._normalize_alias(payload.get("league"), self.league_aliases)
+        home = self._normalize_team(payload.get("home_team"))
+        away = self._normalize_team(payload.get("away_team"))
+        league = self._normalize_league(payload.get("league"))
 
         if not home or not away:
             return NormalizationResult(
                 normalized=[],
-                discarded=[DiscardedOdd(bookmaker, source_event_id, "unknown_team_alias", payload)],
+                discarded=[DiscardedOdd(bookmaker, source_event_id, "invalid_team_name", payload)],
             )
         if not league:
             return NormalizationResult(
                 normalized=[],
-                discarded=[DiscardedOdd(bookmaker, source_event_id, "unknown_league_alias", payload)],
+                discarded=[DiscardedOdd(bookmaker, source_event_id, "invalid_league_name", payload)],
             )
 
         event_start_utc = self._parse_utc(payload.get("event_start"))
@@ -122,11 +123,23 @@ class OddsNormalizer:
 
         return NormalizationResult(normalized=normalized, discarded=discarded)
 
-    def _normalize_alias(self, value: Any, alias_map: dict[str, str]) -> str | None:
+    def _normalize_team(self, value: Any) -> str | None:
+        tokens = self._canonical_tokens(value, self.TEAM_NOISE_TOKENS)
+        return " ".join(tokens) if tokens else None
+
+    def _normalize_league(self, value: Any) -> str | None:
+        tokens = self._canonical_tokens(value, self.LEAGUE_NOISE_TOKENS)
+        return " ".join(tokens) if tokens else None
+
+    def _canonical_tokens(self, value: Any, noise_tokens: set[str]) -> list[str]:
         if not value:
-            return None
-        key = self._key(str(value))
-        return alias_map.get(key)
+            return []
+        base = self._key(str(value))
+        if not base:
+            return []
+        raw_tokens = [t for t in base.split(" ") if t]
+        tokens = [t for t in raw_tokens if t not in noise_tokens]
+        return tokens or raw_tokens
 
     def _parse_utc(self, value: Any) -> datetime | None:
         if not isinstance(value, str) or not value.strip():
@@ -158,7 +171,6 @@ class OddsNormalizer:
             s = str(value).strip()
             if not s:
                 return None
-            # fraccional "5/2" -> 3.5
             if "/" in s:
                 parts = s.split("/")
                 if len(parts) == 2:
@@ -170,7 +182,6 @@ class OddsNormalizer:
                         return (num / den) + Decimal("1")
                     except InvalidOperation:
                         return None
-            # americano +150 / -120
             if s.startswith(("+", "-")):
                 try:
                     american = Decimal(s)

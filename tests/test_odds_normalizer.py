@@ -3,10 +3,10 @@ from decimal import Decimal
 from src.normalizers.odds_normalizer import OddsNormalizer
 
 
-def test_normalizes_aliases_market_time_and_decimal_odds() -> None:
+def test_normalizes_names_market_time_and_decimal_odds_without_aliases() -> None:
     normalizer = OddsNormalizer()
     payload = {
-        "home_team": "Atl. Nacional",
+        "home_team": "Atl. Nacional FC",
         "away_team": "América de Cali",
         "league": "Liga BetPlay",
         "event_start": "2026-05-02T20:00:00-05:00",
@@ -20,8 +20,9 @@ def test_normalizes_aliases_market_time_and_decimal_odds() -> None:
 
     assert len(result.discarded) == 0
     assert len(result.normalized) == 2
-    assert result.normalized[0].home_team == "Atlético Nacional"
-    assert result.normalized[0].league == "Colombia - Categoría Primera A"
+    assert result.normalized[0].home_team == "atl nacional"
+    assert result.normalized[0].away_team == "america de cali"
+    assert result.normalized[0].league == "betplay"
     assert result.normalized[0].event_start_utc.isoformat() == "2026-05-03T01:00:00+00:00"
     assert result.normalized[0].odds_decimal == Decimal("2.5")
     assert result.normalized[1].odds_decimal == Decimal("3.5")
