@@ -1,0 +1,16 @@
+{
+  "event": {
+    "id": "evt1",
+    "league": "Liga BetPlay DIMAYOR",
+    "home_team": "At. Nacional",
+    "away_team": "América de Cali",
+    "start_time": "2026-05-10T20:00:00Z"
+  },
+  "markets": [
+    {"name": "1x2", "selections": [
+      {"name": "Local", "code": "home", "odds": "2.2"},
+      {"name": "Empate", "code": "draw", "odds": "3.6"},
+      {"name": "Visitante", "code": "away", "odds": "3.9"}
+    ]}
+  ]
+}

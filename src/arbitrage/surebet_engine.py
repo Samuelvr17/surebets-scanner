@@ -4,31 +4,31 @@ from decimal import Decimal
 
 from src.models.schemas import CanonicalOdd, SurebetResult
 
-
-def _group_key(odd: CanonicalOdd) -> tuple[str, str, str, str | None, str | None]:
-    if odd.market_family in {'totals', 'handicap'}:
-        return (odd.event_key, odd.market_family, odd.period, odd.line_value, odd.line_unit)
-    return (odd.event_key, odd.market_family, odd.period, None, None)
+REQUIRED = {'1x2': {'home', 'draw', 'away'}, 'moneyline_2way': {'home', 'away'}, 'totals': {'over', 'under'}}
 
 
-def detect_surebet(legs: list[CanonicalOdd], event_key: str) -> SurebetResult:
+def detect_surebet(legs: list[CanonicalOdd], event_key: str, bankroll: Decimal | None = None) -> SurebetResult:
     if not legs:
         return SurebetResult(False, event_key, '', '', None, None, Decimal('0'), Decimal('0'), [], 'empty_market')
+    family = legs[0].market_family
     best: dict[str, CanonicalOdd] = {}
     for leg in legs:
-        current = best.get(leg.side_code)
-        if current is None or leg.odds_decimal > current.odds_decimal:
+        if leg.side_code not in REQUIRED.get(family, set()):
+            continue
+        if family == 'totals' and leg.line_value != legs[0].line_value:
+            continue
+        if leg.side_code not in best or leg.odds_decimal > best[leg.side_code].odds_decimal:
             best[leg.side_code] = leg
     selected = list(best.values())
-    family = legs[0].market_family
-    required = {'1x2': {'home', 'draw', 'away'}, 'moneyline_2way': {'home', 'away'}, 'totals': {'over', 'under'}, 'handicap': {'home', 'away'}}.get(family, set())
-    if required and not required.issubset({x.side_code for x in selected}):
-        return SurebetResult(False, event_key, family, legs[0].period, legs[0].line_value, legs[0].line_unit, Decimal('0'), Decimal('0'), selected, 'incomplete_market')
-    if family in {'totals', 'handicap'} and len({(x.line_value, x.line_unit) for x in selected}) > 1:
+    needed = REQUIRED.get(family, set())
+    if needed and not needed.issubset(best.keys()):
         return SurebetResult(False, event_key, family, legs[0].period, legs[0].line_value, legs[0].line_unit, Decimal('0'), Decimal('0'), selected, 'incomplete_market')
     if len({x.bookmaker for x in selected}) < 2:
         return SurebetResult(False, event_key, family, legs[0].period, legs[0].line_value, legs[0].line_unit, Decimal('0'), Decimal('0'), selected, 'single_bookmaker')
     implied = sum(Decimal('1') / x.odds_decimal for x in selected)
     roi = ((Decimal('1') / implied) - Decimal('1')) * Decimal('100')
     is_sb = implied < Decimal('1')
-    return SurebetResult(is_sb, event_key, family, legs[0].period, legs[0].line_value, legs[0].line_unit, implied, roi, selected, 'ok' if is_sb else 'no_longer_surebet')
+    stake_plan = None
+    if is_sb and bankroll:
+        stake_plan = {f'{x.bookmaker}:{x.side_code}': (bankroll / (x.odds_decimal * implied)).quantize(Decimal('0.01')) for x in selected}
+    return SurebetResult(is_sb, event_key, family, legs[0].period, legs[0].line_value, legs[0].line_unit, implied, roi, selected, 'ok' if is_sb else 'no_longer_surebet', stake_plan)

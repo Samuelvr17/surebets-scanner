@@ -1,0 +1,33 @@
+{
+  "sources": [
+    {
+      "id": "local_demo",
+      "type": "local_snapshot",
+      "enabled": true,
+      "input_dir": "data/input_snapshots",
+      "initial": "snapshot_t0",
+      "latest": "snapshot_t1_valid"
+    },
+    {
+      "id": "example_authorized_api",
+      "type": "authorized_api",
+      "enabled": false,
+      "base_url": "",
+      "api_key_env": "EXAMPLE_API_KEY",
+      "sports": [
+        "soccer"
+      ],
+      "markets": [
+        "1x2",
+        "totals"
+      ]
+    },
+    {
+      "id": "betplay",
+      "type": "bookmaker_adapter",
+      "enabled": false,
+      "bookmaker": "betplay",
+      "adapter_profile": "config/profiles/betplay.example.yml"
+    }
+  ]
+}
