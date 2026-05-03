@@ -1,0 +1,5 @@
+[
+  {"bookmaker":"betplay","sport":"soccer","league":"Liga Colombia","home_team":"Atlético Nacional","away_team":"América de Cali","event_start_utc":"2026-05-10T20:00:00Z","market_family":"1x2","period":"ft","side_code":"home","line_value":null,"line_unit":null,"selection":"Home","odds_decimal":"3.60","pulled_at_utc":"2026-05-03T10:00:00Z"},
+  {"bookmaker":"rushbet","sport":"soccer","league":"Liga Colombia","home_team":"Atletico Nacional FC","away_team":"America Cali","event_start_utc":"2026-05-10T20:00:00Z","market_family":"1x2","period":"ft","side_code":"draw","line_value":null,"line_unit":null,"selection":"Draw","odds_decimal":"3.80","pulled_at_utc":"2026-05-03T10:00:00Z"},
+  {"bookmaker":"stake","sport":"soccer","league":"Liga Colombia","home_team":"Atletico Nacional","away_team":"America de Cali","event_start_utc":"2026-05-10T20:00:00Z","market_family":"1x2","period":"ft","side_code":"away","line_value":null,"line_unit":null,"selection":"Away","odds_decimal":"2.50","pulled_at_utc":"2026-05-03T10:00:00Z"}
+]
