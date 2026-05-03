@@ -1,0 +1,6 @@
+[
+  {"bookmaker":"betplay","sport":"soccer","league":"Liga BetPlay","home_team":"Team A","away_team":"Team B","event_start_utc":"2026-05-11T20:00:00Z","market_family":"totals","period":"ft","side_code":"over","line_value":"2.5","line_unit":"goals","selection":"Over 2.5","odds_decimal":"2.10","pulled_at_utc":"2026-05-03T10:00:00Z"},
+  {"bookmaker":"rushbet","sport":"soccer","league":"Liga BetPlay","home_team":"Team A","away_team":"Team B","event_start_utc":"2026-05-11T20:00:00Z","market_family":"totals","period":"ft","side_code":"under","line_value":"2.5","line_unit":"goals","selection":"Under 2.5","odds_decimal":"2.10","pulled_at_utc":"2026-05-03T10:00:00Z"},
+  {"bookmaker":"stake","sport":"soccer","league":"Liga BetPlay","home_team":"Team A","away_team":"Team B","event_start_utc":"2026-05-11T22:00:00Z","market_family":"totals","period":"ft","side_code":"over","line_value":"3.5","line_unit":"goals","selection":"Over 3.5","odds_decimal":"2.15","pulled_at_utc":"2026-05-03T10:00:00Z"},
+  {"bookmaker":"betplay","sport":"soccer","league":"Liga BetPlay","home_team":"Team B","away_team":"Team A","event_start_utc":"2026-05-11T20:00:00Z","market_family":"totals","period":"ft","side_code":"under","line_value":"3.5","line_unit":"goals","selection":"Under 3.5","odds_decimal":"2.15","pulled_at_utc":"2026-05-03T10:00:00Z"}
+]
