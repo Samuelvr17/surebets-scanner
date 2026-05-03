@@ -1,8 +1,19 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
+from typing import Any, Literal
+
+
+SourceType = Literal['local_snapshot', 'authorized_api', 'bookmaker_adapter']
+
+
+@dataclass(slots=True, frozen=True)
+class RawOddsRow:
+    source_id: str
+    payload: dict[str, Any]
+    pulled_at_utc: datetime
 
 
 @dataclass(slots=True, frozen=True)
@@ -24,6 +35,22 @@ class CanonicalOdd:
 
 
 @dataclass(slots=True, frozen=True)
+class SourceHealth:
+    source_id: str
+    source_type: SourceType
+    ok: bool
+    detail: str
+
+
+@dataclass(slots=True, frozen=True)
+class SourceConfig:
+    id: str
+    type: SourceType
+    enabled: bool
+    options: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(slots=True, frozen=True)
 class SurebetResult:
     is_surebet: bool
     event_key: str
@@ -35,6 +62,7 @@ class SurebetResult:
     roi_percent: Decimal
     selected_legs: list[CanonicalOdd]
     reason: str
+    stake_plan: dict[str, Decimal] | None = None
 
 
 @dataclass(slots=True, frozen=True)

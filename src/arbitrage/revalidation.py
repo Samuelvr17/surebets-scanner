@@ -10,7 +10,7 @@ def revalidate_with_new_snapshot(initial_result: SurebetResult, latest_legs: lis
     latest_result = detect_surebet(latest_legs, initial_result.event_key)
     if latest_result.reason == 'incomplete_market':
         return RevalidationResult(False, 'expired', 'incomplete_market', latest_result)
-    if latest_result.implied_probability_sum >= 1 and latest_result.reason == 'no_longer_surebet':
+    if not latest_result.is_surebet and latest_result.implied_probability_sum >= 1:
         return RevalidationResult(False, 'expired', 'margin_lost', latest_result)
     if not latest_result.is_surebet:
         return RevalidationResult(False, 'expired', 'no_longer_surebet', latest_result)

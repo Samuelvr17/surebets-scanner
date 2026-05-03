@@ -1,0 +1,15 @@
+{
+  "sport": "soccer",
+  "default_period": "ft",
+  "event_id_path": "event.id",
+  "league_path": "event.league",
+  "home_team_path": "event.home_team",
+  "away_team_path": "event.away_team",
+  "start_time_path": "event.start_time",
+  "markets_path": "markets",
+  "market_name_path": "name",
+  "selection_path": "selections",
+  "odds_path": "odds",
+  "line_path": "line",
+  "line_unit": "goals"
+}
