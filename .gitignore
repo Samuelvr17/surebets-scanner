@@ -4,3 +4,10 @@ __pycache__/
 *.pyc
 *.sqlite3
 .DS_Store
+.env
+data/sessions/
+data/raw_captures/
+data/debug/
+data/*.db
+data/*.db-wal
+data/*.db-shm

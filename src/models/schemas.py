@@ -23,9 +23,23 @@ class CanonicalOdd:
     pulled_at_utc: datetime
 
 
-@dataclass(slots=True)
-class SurebetCandidate:
+@dataclass(slots=True, frozen=True)
+class SurebetResult:
+    is_surebet: bool
     event_key: str
-    market_key: str
     market_family: str
-    legs: list[CanonicalOdd]
+    period: str
+    line_value: str | None
+    line_unit: str | None
+    implied_probability_sum: Decimal
+    roi_percent: Decimal
+    selected_legs: list[CanonicalOdd]
+    reason: str
+
+
+@dataclass(slots=True, frozen=True)
+class RevalidationResult:
+    is_valid: bool
+    status: str
+    reason: str
+    latest_result: SurebetResult | None
